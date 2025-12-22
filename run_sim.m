@@ -52,8 +52,8 @@ if make_new_connectivity
     end
     % Choose main and secondary barrels
     barrelstruct{2,1}.mainbarrel    = 1; % main
-    barrelstruct{1,1}.mainbarrel    = 2; % secondary
-    barrelstruct{3,1}.mainbarrel    = 2; % tertiary
+    barrelstruct{1,1}.mainbarrel    = 3; % secondary
+    barrelstruct{3,1}.mainbarrel    = 3; % tertiary
     
     % Generate connectivity
     generate_connectivity(barrelstruct, savefolder, savename)
