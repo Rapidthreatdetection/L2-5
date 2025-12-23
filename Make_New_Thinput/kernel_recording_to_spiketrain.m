@@ -216,42 +216,8 @@ nkk = length(kk);
 
 if plotyn
 %     % Kernels
-      figure
-      plot_thalamic_kernels(KernelStruct)
-% 
-%     % Activation functions
-%     figure
-%     nsubplotx = floor(sqrt(Nkernel));
-%     nsubploty = ceil(sqrt(Nkernel));
-%     for nk = 1:Nkernel
-%         subplot(nsubplotx, nsubploty, nk)
-%         hold all
-%         if Ndimk == 1
-%             plot(kk,  feval(KernelStruct.ActivationFunction.function, kk, KernelStruct.ActivationFunction.Params{nk}))
-%             xlabel('Recording*kernel')
-%             ylabel(['Spikes / sec'])
-%             xlim([kk(1), kk(end)])
-%         elseif Ndimk == 2
-%             [X,Y] = meshgrid(kk,kk);
-%             Z = nan*ones(nkk,nkk);
-%             for nnkk = 1:nkk
-%                 Z(nnkk,:) = feval(KernelStruct.ActivationFunction.function,[X(nnkk,:);Y(nnkk,:)] , KernelStruct.ActivationFunction.Params{nk});
-%             end
-%             surf(X,Y, Z, 'LineStyle','none')
-%             xlabel('Recording*kernel, dimension 1')
-%             ylabel('Recording*kernel, dimension 2')
-%             xlim([minct, maxct])
-%             ylim([minct, maxct])
-%             zlabel('Spikes / sec')
-%             view(gca, [-37.5 30]);
-% 
-%         else
-%             disp('Cannot display activation functions: too many dimensions')
-%         end
-%         title(['Kernel ' num2str(nk)])
-%         box on
-%         grid on
-%     end   
+    figure
+    plot_thalamic_kernels(KernelStruct)
     
     % Recordings, PSTHs, Spike Trains
     maxr = 0;
@@ -262,30 +228,6 @@ if plotyn
     for nt = 1:Ntrace
         figure
         for nk = 1:Nkernel
-            for ndim = 2:Ndimk
-%               只显示一个输入
-%                 subplot(4,1,1)
-%                 hold all
-%                 if length(WhiskerStruct.Recording{ndim,nt})*WhiskerStruct.binsize>maxt
-%                     maxt = length(WhiskerStruct.Recording{ndim,nt});
-%                     disp(maxt)
-%                 end
-%                 plot((1:length(WhiskerStruct.Recording{ndim,nt}))*WhiskerStruct.binsize, WhiskerStruct.Recording{ndim,nt})
-%                 title(['Recording dimension '])
-%                 xlim([100 150])
-%                 box on
-%                 grid on
-                
-%                 subplot(4,Ndimw,Ndimw+ndim)
-%                 subplot(3,1,1)
-%                 hold all
-%                 plot(binsize_kernels*(1:length(ConvTrace{nk,nt}(ndim,:))),ConvTrace{nk,nt}(ndim,:))
-%                 title('Recording * kernel')
-%                 xlim(win)
-%                 set(gca, 'XTick', xtick_values, 'XTickLabel', xtick_labels); 
-%                 box on               
-            end
-            
             subplot(2,1,1)
             hold all            
             plot((1:length(SpikeTrainStruct.PSTH{nk, nt}))*binsize_kernels, SpikeTrainStruct.PSTH{nk, nt})

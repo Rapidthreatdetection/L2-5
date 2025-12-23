@@ -38,138 +38,6 @@ f = filesep;
     end
     Ntrial = length(trialvec);
     for nt = 1:Ntrial
-%       WhiskerTrace.Recording{1,nt} = pi*squeeze(whiskermat(1,:,trialvec(nt)))/180;    % from degree to radian (base angle)
-%       WhiskerTrace.Recording{2,nt} = squeeze(whiskermat(2,:,trialvec(nt))); 
-%         WhiskerTrace.Recording{1,nt} = zeros(size(squeeze(whiskermat(1,:,trialvec(nt)))));    % set angle=0
-        
-        % #Tag:输入的修改:1 针对弯曲度原始数据 
-%         % 方法1:
-%         % 设置弯曲的参数
-%         stimulus_start = 1000;  % 弯曲开始时间(单位:ms)
-%         stimulus_duration = 10;  % 弯曲持续时间(单位:ms)
-%         stimulus_amplitude = 8e-3;  % 弯曲程度(10^-3)
-%         tau_fast = 2;  % 快速过程的时间常数 (ms) - 同时用于上升和下降
-%         % 获取当前试次的弯曲度数据
-%         curvature_data = squeeze(whiskermat(2, :, trialvec(nt)));
-%         
-%         % 创建一个新的弯曲度数据序列，将其设置为零
-%         new_curvature_data = zeros(1, length(curvature_data));
-%         
-%         % 设置时间序列
-%         t = 1:length(curvature_data);  % 时间向量
-%         
-%         % 创建刺激信号，使用相同的时间常数模拟快速上升和快速下降过程
-%         stimulus_signal = zeros(1, length(curvature_data));
-%         
-%         % 上升部分：快速上升
-%         for i = stimulus_start:stimulus_start + stimulus_duration
-%             if i <= length(stimulus_signal)
-%                 time_from_start = i - stimulus_start;
-%                 stimulus_signal(i) = stimulus_amplitude * (1 - exp(-time_from_start / tau_fast));
-%             end
-%         end
-%         
-%         % 下降部分：快速下降
-%         for i = stimulus_start + stimulus_duration + 1:length(stimulus_signal)
-%             time_from_end = i - (stimulus_start + stimulus_duration);
-%             stimulus_signal(i) = stimulus_amplitude * exp(-time_from_end / tau_fast);
-%         end
-%         
-%         % 将修改后的弯曲度数据存储回 WhiskerTrace 结构体
-%         WhiskerTrace.Recording{2, nt} = stimulus_signal;
-
-        % 方法2:
-        % 设置弯曲的参数
-%         stimulus_start = 1000;  % 弯曲开始时间(单位:ms)
-%         stimulus_total_duration = 4;  % 刺激总持续时间(单位:ms) - 包括上升和下降
-%         stimulus_amplitude = 8e-3;  % 弯曲程度(10^-3)
-%         tau_fast = 2;  % 快速过程的时间常数 (ms) - 同时用于上升和下降
-% 
-%         % 获取当前试次的弯曲度数据
-%         curvature_data = squeeze(whiskermat(2, :, trialvec(nt)));
-% 
-%         % 创建一个新的弯曲度数据序列，将其设置为零
-%         new_curvature_data = zeros(1, length(curvature_data));
-% 
-%         % 设置时间序列
-%         t = 1:length(curvature_data);  % 时间向量
-% 
-%         % 创建刺激信号
-%         stimulus_signal = zeros(1, length(curvature_data));
-% 
-%         % 计算上升和下降的时间分配
-%         % 这里我们让上升和下降各占一半时间
-%         rise_time = stimulus_total_duration / 2;
-%         fall_time = stimulus_total_duration / 2;
-% 
-%         % 上升部分：从0到峰值
-%         for i = stimulus_start:stimulus_start + rise_time - 1
-%             if i <= length(stimulus_signal)
-%                 time_from_start = i - stimulus_start;
-%                 stimulus_signal(i) = stimulus_amplitude * (1 - exp(-time_from_start / tau_fast));
-%             end
-%         end
-%         % 这里我们不保持峰值，直接开始下降
-%         % 下降部分：从峰值到0
-%         for i = stimulus_start + rise_time:stimulus_start + rise_time + fall_time - 1
-%             if i <= length(stimulus_signal)
-%                 time_from_peak = i - (stimulus_start + rise_time);
-%                 stimulus_signal(i) = stimulus_amplitude * exp(-time_from_peak / tau_fast);
-%             end
-%         end
-% 
-%         % 将修改后的弯曲度数据存储回 WhiskerTrace 结构体
-%         WhiskerTrace.Recording{2,nt} = stimulus_signal;
-        
-        % 方法三
-        % single
-%         curvature_data = squeeze(whiskermat(2, :, trialvec(nt)));
-%         stimulus_start = 50;      % ms
-%         tau = 2;                    % ms
-%         stimulus_amplitude = 6e-3;
-% 
-%         N = length(curvature_data);
-%         t = 1:N;
-%         stimulus_signal = zeros(1,N);
-% 
-%         x = (t - stimulus_start);        % 从开始时刻计时
-%         idx = x >= 0;
-%         u = x(idx) / tau;                % 无量纲时间
-%         alpha = u .* exp(1 - u);         % α(t) = (t/τ)*exp(1 - t/τ), t>=0
-%         alpha(alpha < 0) = 0;            % 理论上不会<0，这里仅保险
-%         stimulus_signal(idx) = stimulus_amplitude * alpha;
-%         stimulus_signal(t >(stimulus_start + tau)) = 0;
-%         WhiskerTrace.Recording{2,nt} = stimulus_signal;
-        
-        % multi
-        % 1连续型脉冲刺激
-%         curvature_data = squeeze(whiskermat(2, :, trialvec(nt)));
-%         tau = 6;
-%         stimulus_amplitude = 6e-3;
-%         N = length(curvature_data);
-%         t = 1:N;
-%         stimulus_signal = zeros(1,N);
-%         num_pulses = 50;
-%         for k = 1:num_pulses
-%             stimulus_start = k * 50;          % 本段起始：50,100,150,...
-%         
-%             % 仍用你的写法：x 从本段起点计时，但只在 [0, tau] 内写入
-%             x = (t - stimulus_start);
-%             idx = (x >= 0) & (x <= tau);           % 仅当前时间段窗口
-%         
-%             if any(idx)
-%                 u = x(idx) / tau;                  % 无量纲时间
-%                 alpha = u .* exp(1 - u);           % α(t) = (t/τ)*exp(1 - t/τ)
-%                 alpha(alpha < 0) = 0;              % 保险
-%                 % 仅对当前窗口做“叠加写入”，不触碰其它时间点
-%                 stimulus_signal(idx) = stimulus_signal(idx) + stimulus_amplitude * alpha;
-%             end
-%         end
-%         WhiskerTrace.Recording{2,nt} = stimulus_signal;
-        % 2矩形脉冲参数
-%         curvature_data = squeeze(whiskermat(2, :, trialvec(nt)));
-%         disp('length(curvature_data)');
-%         disp(length(curvature_data)); %
         start_time = 100;        % 脉冲起始时间点
         duration = 1;           % 脉冲持续时间
         amplitude_A = 3e-2;     % 脉冲幅值
@@ -251,15 +119,15 @@ f = filesep;
                 SpikeGenStruct{nbx,nby}.scaling           = 1; % Scaling of PSTH
             elseif Barrelstruct{nbx,nby}.mainbarrel == 2
                 % secondary barreloid
-                SpikeGenStruct{nbx,nby}.delay             = 2.5; % (ms)
-                SpikeGenStruct{nbx,nby}.scaling           = .3;
+                SpikeGenStruct{nbx,nby}.delay             = 0; % (ms)
+                SpikeGenStruct{nbx,nby}.scaling           = 0;
             elseif Barrelstruct{nbx,nby}.mainbarrel == 3
                 % tertiary barreloid: no spikes
                 SpikeGenStruct{nbx,nby}.delay             = 0; % (ms)
                 SpikeGenStruct{nbx,nby}.scaling           = 0;
             end
             % Generate spike trains
-            plotyn = 1;
+            plotyn = 0;
             SpikeTrainStruct{nbx,nby} = kernel_recording_to_spiketrain(WhiskerTrace, KernelStruct{nbx,nby}, SpikeGenStruct{nbx,nby}, [savefolder savename_input '_Thalamic_Spike_Trains_barrel_' num2str(nbx) '_' num2str(nby)], plotyn);
             
         end

@@ -226,25 +226,25 @@ N_L5_PVp = round(N_L5_I * fracPVp_inhib);
 N_L5_PVm = N_L5_I - N_L5_PVp;
 fired_L5_prev = [];   % buffer: 上一步的 L5 spikes
 L5_refrac_timer = zeros(N_L5,1);   % refractory counter in ms
-L5_refrac_period = 3;              % absolute refractory = 3 ms
+L5_refrac_period = 6;              % absolute refractory = 5 ms
 
 
 % Pyramidal (bursting) excitatory cell parameters (L5E)
 aE = 0.01;  % Self-adaptation
 bE = 0.5;   % Recovery variable
-cE = -65;   % Membrane potential after spike
+cE = -70;   % Membrane potential after spike
 dE = 8;     % Spike-triggered adaptation
 
 % PV+ (FS) inhibitory cell parameters (L5I PV+)
 aI_PVp = 0.08;   % Self-adaptation parameter
 bI_PVp = 0.85;   % Recovery variable gain
-cI_PVp = -65;   % Membrane potential after spike
+cI_PVp = -70;   % Membrane potential after spike
 dI_PVp = 10;     % Spike-triggered adaptation
 
 % PV- inhibitory cell parameters (user request)
 aI_PVm = 0.01;
 bI_PVm = 0.3;
-cI_PVm = -65;
+cI_PVm = -70;
 dI_PVm = 8;
 
 % build parameter vectors for L5
@@ -256,8 +256,8 @@ d_L5 = [dE*ones(N_L5_E,1); dI_PVp*ones(N_L5_PVp,1); dI_PVm*ones(N_L5_PVm,1)];
 % initial membrane variables for L5 (sampled similarly to main network)
 % ----- L5 excitatory (pyramidal, bursting) and inhibitory (PV) - unified defaults -----
 % 为提高 L5_exc 的放电性，统一 E/I 的起始电位/阈值等（a/b/c/d 保持不同）
-Vrest_common = -72;   % common resting potential for L5
-V0_common    = -70;   % common initial membrane potential
+Vrest_common = -75;   % common resting potential for L5
+V0_common    = -75;   % common initial membrane potential
 stdV0_common = 2;
 
 Vrest_E = Vrest_common;
@@ -278,7 +278,7 @@ u_L5  = zeros(N_L5,1);   % FS 和 bursting 初始 u=0 是对的
 
 % threshold for L5 
 % 将 E/I 起始阈值统一以避免抑制侧偏（较高的阈值会抑制 E 的放电）
-vt_L5_common = -40; % common spike threshold (mV)
+vt_L5_common = -30; % common spike threshold (mV)
 vt_L5_E = vt_L5_common * ones(N_L5_E, 1);
 vt_L5_PVp = vt_L5_common * ones(N_L5_PVp, 1);
 vt_L5_PVm = vt_L5_common * ones(N_L5_PVm, 1);
@@ -291,7 +291,7 @@ modelspt_L5 = zeros(N_L5, 6000, 'single'); % prealloc small matrix; will grow if
 
 % synaptic state for simplified L5 synapses (per-post conductance/current)
 % Using simplified single-exponential synapse for speed/clarity
-tau_syn_E = 3; % ms
+tau_syn_E = 6; % ms
 tau_syn_I = 6; % ms
 s_L5 = zeros(N_L5,1); % synaptic drive (sum of contributions)
 % per-post tau for L5
@@ -304,7 +304,7 @@ p_L5I_to_L23E = 0.08; % L5 inhibitory -> L2/3 excitatory
 
 % amplitude defaults (increased to give stronger L5 drive and feedback)
 % 注意：这些值是经验性调整，单位与模型中 I/g 的标度相关，可在需要时微调
-amp_EE = 0.12; amp_EI = 0.20; amp_IE = -0.40; amp_II = -0.15;
+amp_EE = 0.1; amp_EI = 0.1; amp_IE = -0.1; amp_II = -0.1;
 
 % construct mapping from existing network to L5
 post_L5_E_idx   = 1:N_L5_E;
@@ -321,20 +321,11 @@ post_L5_PVm_idx = N_L5_E+N_L5_PVp+1:N_L5;
 if ~exist('L5ConnParams','var') || isempty(L5ConnParams)
     maxType_for_table = 15;
     p_to_L5 = zeros(maxType_for_table, 3);
-    % 默认建议值（行 = 用户给定类型序号 1..15，列 = [to L5_E, to L5_I])
-    % p_to_L5(1,:)  = [0.20, 0, 0]; % L4 Exc 1 (increased drive to L5_E)
-    p_to_L5(2,:)  = [0.02, 0.02, 0.02]; % L4 Exc 2 (increased drive to L5_E)
-    p_to_L5(3,:)  = [0.02, 0.08, 0.02]; % L4 PV+ FS
-    % p_to_L5(4,:)  = [0.15, 0.20, 0.20]; % L4 Non-FS
-    p_to_L5(5,:)  = [0.10, 0.10, 0.05]; % L2/3 Exc (increased drive to L5_E)
-    p_to_L5(6,:)  = [0.02, 0.05, 0.01]; % L2/3 PV+
-    % p_to_L5(7,:)  = [0.50, 0.20, 0.20]; % L2/3 PV+
-    % p_to_L5(8,:)  = [0.45, 0.35, 0.30]; % PV+ bursting
-    % p_to_L5(9,:)  = [0.25, 0.20, 0.20]; % Martinotti / SOM
-    % p_to_L5(11,:) = [0.10, 0.30, 0.25]; % VIP+/CR-
-%     p_to_L5(12,:) = [0.08, 0.25, 0.20]; % CR+ bipolar
-%     p_to_L5(14,:) = [0.08, 0.25, 0.20]; % CR+ multipolar
-    % p_to_L5(15,:) = [0.20, 0.20, 0.20]; % Neurogliaform
+    % 默认建议值（行 = 用户给定类型序号 1..15，列 = [to L5_E, to L5_I_PV+, to L5_I_PV-])
+    p_to_L5(2,:)  = [0.03, 0.06, 0.02]; % L4 Exc 2 (increased drive to L5_E)
+    p_to_L5(3,:)  = [0.02, 0.02, 0.01]; % L4 PV+ FS
+    p_to_L5(5,:)  = [0.08, 0.10, 0.02]; % L2/3 Exc (increased drive to L5_E)
+    p_to_L5(6,:)  = [0.03, 0.03, 0.02]; % L2/3 PV+
 
     L5ConnParams.p_to_L5 = p_to_L5;
     L5ConnParams.maxType = maxType_for_table;
@@ -342,7 +333,7 @@ if ~exist('L5ConnParams','var') || isempty(L5ConnParams)
     L5ConnParams.p_L5_to_L23 = [p_L5E_to_L23E; p_L5I_to_L23E];
     % internal L5 connectivity: rows pre E/I, cols post E/I
     % set more balanced internal probabilities to avoid runaway inhibition
-    L5ConnParams.p_internal = [0.06, 0.12; 0.10, 0.20]; % [E->E, E->I; I->E, I->I]
+    L5ConnParams.p_internal = [0.01, 0.02; 0.05, 0.02]; % [E->E, E->I; I->E, I->I]
     L5ConnParams.labels = { 'type1','type2','type3','type4','type5','type6','type7','type8','type9','type10','type11','type12','type13','type14','type15' };
 end
 
