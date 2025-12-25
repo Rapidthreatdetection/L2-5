@@ -277,11 +277,12 @@ u_L5  = zeros(N_L5,1);   % FS 和 bursting 初始 u=0 是对的
 
 
 % threshold for L5 
-% 将 E/I 起始阈值统一以避免抑制侧偏（较高的阈值会抑制 E 的放电）
-vt_L5_common = -30; % common spike threshold (mV)
-vt_L5_E = vt_L5_common * ones(N_L5_E, 1);
-vt_L5_PVp = vt_L5_common * ones(N_L5_PVp, 1);
-vt_L5_PVm = vt_L5_common * ones(N_L5_PVm, 1);
+vt_L5_E_val   = -35;  % EXC 
+vt_L5_PVp_val = -35;  % PV+ 
+vt_L5_PVm_val = -35;  % PV- 
+vt_L5_E = vt_L5_E_val * ones(N_L5_E, 1);
+vt_L5_PVp = vt_L5_PVp_val * ones(N_L5_PVp, 1);
+vt_L5_PVm = vt_L5_PVm_val * ones(N_L5_PVm, 1);
 vt_L5 = [vt_L5_E; vt_L5_PVp; vt_L5_PVm];
 VT0_L5 = vt_L5;
 
@@ -291,20 +292,32 @@ modelspt_L5 = zeros(N_L5, 6000, 'single'); % prealloc small matrix; will grow if
 
 % synaptic state for simplified L5 synapses (per-post conductance/current)
 % Using simplified single-exponential synapse for speed/clarity
-tau_syn_E = 6; % ms
-tau_syn_I = 6; % ms
+tau_syn_E = 20; % ms
+tau_syn_I = 5; % ms
 s_L5 = zeros(N_L5,1); % synaptic drive (sum of contributions)
 % per-post tau for L5
 tau_post_L5 = [tau_syn_E*ones(N_L5_E,1); tau_syn_I*ones(N_L5_PVp,1); tau_syn_I*ones(N_L5_PVm,1)];
 
 % Connection probabilities (defaults)
-p_L5E_to_L23E = 0.12; % L5 excitatory -> L2/3 excitatory
-p_L5I_to_L23E = 0.08; % L5 inhibitory -> L2/3 excitatory
+% rows:   pre = [L5_E; L5_PV+; L5_PV-]
+% cols:   post = [L23_E; L23_PV+; L23_PV-]
+p_L5_to_L23_default = [0.01, 0.06, 0.06;  % L5_E   -> L23 (E / PV+ / PV-)
+                       0.00, 0.00, 0.00;  % L5_PV+ -> L23 (E / PV+ / PV-)
+                       0.08, 0.02, 0.00]; % L5_PV- -> L23 (E / PV+ / PV-)
+% L5 内部概率 (默认 3x3: pre 行 E/PV+/PV-, post 列 E/PV+/PV-)
+p_L5_internal_default = [0.12, 0.15, 0.15;  % L5_E   -> L5 (E / PV+ / PV-)
+                         0.50, 0.45, 0.05;  % L5_PV+ -> L5 (E / PV+ / PV-)
+                         0.30, 0.15, 0.02]; % L5_PV- -> L5 (E / PV+ / PV-)
 
 
 % amplitude defaults (increased to give stronger L5 drive and feedback)
 % 注意：这些值是经验性调整，单位与模型中 I/g 的标度相关，可在需要时微调
-amp_EE = 0.1; amp_EI = 0.1; amp_IE = -0.1; amp_II = -0.1;
+amp_EE = 0.1; 
+amp_EI = 1.2; 
+amp_IE_PVp = -0.35;   % PV+ -> E
+amp_IE_PVm = -0.1;   % PV- -> E
+amp_II_PVp = -0.05;   % PV+ -> I
+amp_II_PVm = -0.1;   % PV- -> I
 
 % construct mapping from existing network to L5
 post_L5_E_idx   = 1:N_L5_E;
@@ -323,17 +336,16 @@ if ~exist('L5ConnParams','var') || isempty(L5ConnParams)
     p_to_L5 = zeros(maxType_for_table, 3);
     % 默认建议值（行 = 用户给定类型序号 1..15，列 = [to L5_E, to L5_I_PV+, to L5_I_PV-])
     p_to_L5(2,:)  = [0.03, 0.06, 0.02]; % L4 Exc 2 (increased drive to L5_E)
-    p_to_L5(3,:)  = [0.02, 0.02, 0.01]; % L4 PV+ FS
-    p_to_L5(5,:)  = [0.08, 0.10, 0.02]; % L2/3 Exc (increased drive to L5_E)
-    p_to_L5(6,:)  = [0.03, 0.03, 0.02]; % L2/3 PV+
+    p_to_L5(3,:)  = [0.00, 0.00, 0.00]; % L4 PV+ FS
+    p_to_L5(5,:)  = [0.08, 0.04, 0.12]; % L2/3 Exc (increased drive to L5_E)
+    p_to_L5(6,:)  = [0.00, 0.00, 0.00]; % L2/3 PV+
 
     L5ConnParams.p_to_L5 = p_to_L5;
     L5ConnParams.maxType = maxType_for_table;
-    % L5 -> L2/3 probabilities (E row; I row)
-    L5ConnParams.p_L5_to_L23 = [p_L5E_to_L23E; p_L5I_to_L23E];
-    % internal L5 connectivity: rows pre E/I, cols post E/I
-    % set more balanced internal probabilities to avoid runaway inhibition
-    L5ConnParams.p_internal = [0.01, 0.02; 0.05, 0.02]; % [E->E, E->I; I->E, I->I]
+    % L5 -> L2/3 probabilities (3x3: pre rows E/PV+/PV-, post cols E/PV+/PV-)
+    L5ConnParams.p_L5_to_L23 = p_L5_to_L23_default;
+    % internal L5 connectivity: 3x3 pre E/PV+/PV- -> post E/PV+/PV-
+    L5ConnParams.p_internal = p_L5_internal_default;
     L5ConnParams.labels = { 'type1','type2','type3','type4','type5','type6','type7','type8','type9','type10','type11','type12','type13','type14','type15' };
 end
 
@@ -343,11 +355,24 @@ if size(L5ConnParams.p_to_L5,2) == 2
 end
 
 if ~isfield(L5ConnParams, 'p_L5_to_L23')
-    L5ConnParams.p_L5_to_L23 = [p_L5E_to_L23E; p_L5I_to_L23E]; % [Erow; Irow]
+    L5ConnParams.p_L5_to_L23 = p_L5_to_L23_default; % 3x3
+end
+% 强制 p_L5_to_L23 至少为 3x3；若旧格式缺列/行，则用默认值填充
+pL5 = L5ConnParams.p_L5_to_L23;
+if size(pL5,1) < 3 || size(pL5,2) < 3
+    pL5_expanded = p_L5_to_L23_default;
+    pL5_expanded(1:size(pL5,1), 1:size(pL5,2)) = pL5;
+    L5ConnParams.p_L5_to_L23 = pL5_expanded;
 end
 if ~isfield(L5ConnParams, 'p_internal')
-    L5ConnParams.p_internal = [0.10, 0.10; 0.10, 0.10];
-    % rows: pre E(1)/I(2), cols: post E(1)/I(2)
+    L5ConnParams.p_internal = p_L5_internal_default; % 3x3
+end
+% 强制 p_internal 至少为 3x3；若旧格式缺行/缺列，则用默认值填充
+pInt = L5ConnParams.p_internal;
+if size(pInt,1) < 3 || size(pInt,2) < 3
+    pInt_expanded = p_L5_internal_default;
+    pInt_expanded(1:size(pInt,1), 1:size(pInt,2)) = pInt;
+    L5ConnParams.p_internal = pInt_expanded;
 end
 
 % create cell arrays: for each existing pre neuron, list of L5 posts it connects to
@@ -372,38 +397,60 @@ for pi = 1:ConData.NAll
 end
 % end of pre2L5 construction (now using L5ConnParams)
 
-% create L5 -> L2/3 mapping (only target L2/3 excitatory cells, type 5)
-post_idx_L23E = find(ConData.Cellinfo_All(:,4) == 5);
+% create L5 -> L2/3 mapping (targets: L2/3 E, PV+, PV- if present)
+post_idx_L23E   = find(ConData.Cellinfo_All(:,4) == 5);
+post_idx_L23PVp = find(ConData.Cellinfo_All(:,4) == 6);
+post_idx_L23PVm = find(ConData.Cellinfo_All(:,4) == 7); % 若无 PV- 类型则为空
 L5toL23 = cell(N_L5,1);
-% get probabilities for E->L23E and I->L23E from L5ConnParams
-p_L5E_to_L23E_use = L5ConnParams.p_L5_to_L23(1);
-p_L5I_to_L23E_use = L5ConnParams.p_L5_to_L23(2);
+% use full 3x3 prob matrix (rows pre: E/PVp/PVm; cols post: E/PVp/PVm)
 for j = 1:N_L5
     if j <= N_L5_E
-        mask = rand(length(post_idx_L23E),1) < p_L5E_to_L23E_use;
-        L5toL23{j} = post_idx_L23E(mask);
+        prow = 1;
+    elseif j <= N_L5_E + N_L5_PVp
+        prow = 2;
     else
-        mask = rand(length(post_idx_L23E),1) < p_L5I_to_L23E_use;
-        L5toL23{j} = post_idx_L23E(mask);
+        prow = 3;
     end
+    posts = [];
+    if ~isempty(post_idx_L23E)
+        maskE = rand(length(post_idx_L23E),1) < L5ConnParams.p_L5_to_L23(prow,1);
+        posts = [posts; post_idx_L23E(maskE)];
+    end
+    if ~isempty(post_idx_L23PVp)
+        maskPVp = rand(length(post_idx_L23PVp),1) < L5ConnParams.p_L5_to_L23(prow,2);
+        posts = [posts; post_idx_L23PVp(maskPVp)];
+    end
+    if ~isempty(post_idx_L23PVm)
+        maskPVm = rand(length(post_idx_L23PVm),1) < L5ConnParams.p_L5_to_L23(prow,3);
+        posts = [posts; post_idx_L23PVm(maskPVm)];
+    end
+    L5toL23{j} = posts;
 end
 
 % internal L5 connectivity (cell -> list)
 L5internal = cell(N_L5,1);
 for j = 1:N_L5
     if j <= N_L5_E
-        pEE = L5ConnParams.p_internal(1,1);
-        pEI = L5ConnParams.p_internal(1,2);
-        maskE = rand(N_L5_E,1) < pEE;
-        maskPVp = rand(N_L5_PVp,1) < pEI;
-        maskPVm = rand(N_L5_PVm,1) < pEI;
+        prow = 1; % L5_E pre
+        pEE  = L5ConnParams.p_internal(prow,1);
+        pEPp = L5ConnParams.p_internal(prow,2);
+        pEPm = L5ConnParams.p_internal(prow,3);
+        maskE = rand(N_L5_E,1)      < pEE;
+        maskPVp = rand(N_L5_PVp,1)  < pEPp;
+        maskPVm = rand(N_L5_PVm,1)  < pEPm;
         L5internal{j} = [post_L5_E_idx(maskE)'; post_L5_PVp_idx(maskPVp)'; post_L5_PVm_idx(maskPVm)'];
     else
-        pIE = L5ConnParams.p_internal(2,1);
-        pII = L5ConnParams.p_internal(2,2);
-        maskE = rand(N_L5_E,1) < pIE;
-        maskPVp = rand(N_L5_PVp,1) < pII;
-        maskPVm = rand(N_L5_PVm,1) < pII;
+        if j <= N_L5_E + N_L5_PVp
+            prow = 2; % L5_PV+ pre
+        else
+            prow = 3; % L5_PV- pre
+        end
+        pIE  = L5ConnParams.p_internal(prow,1);
+        pIPp = L5ConnParams.p_internal(prow,2);
+        pIPm = L5ConnParams.p_internal(prow,3);
+        maskE = rand(N_L5_E,1)      < pIE;
+        maskPVp = rand(N_L5_PVp,1)  < pIPp;
+        maskPVm = rand(N_L5_PVm,1)  < pIPm;
         L5internal{j} = [post_L5_E_idx(maskE)'; post_L5_PVp_idx(maskPVp)'; post_L5_PVm_idx(maskPVm)'];
     end
 end
@@ -596,15 +643,22 @@ for t=1:Nsim % simulation of Ni ms
                 preid = modelfired(pf);
                 posts = pre2L5{preid};
                 if ~isempty(posts)
-                    % only excitatory pres (ConData.Cellinfo_All(:,6)==1) should drive L5 excitatory per spec
-                    preEIflag = ConData.Cellinfo_All(preid, 6);
+                    % split posts by E / I target
+                    postsE = posts(posts <= N_L5_E);
+                    postsI = posts(posts  > N_L5_E);
+                    preEIflag = ConData.Cellinfo_All(preid, 6); % 1=E, 0=I
                     if preEIflag == 1
-                        % add excitatory amplitude
-                        s_L5(posts) = s_L5(posts) + amp_EE;
+                        % excitatory presynaptic from upper network
+                        if ~isempty(postsE)
+                            s_L5(postsE) = s_L5(postsE) + amp_EE;
+                        end
+                        if ~isempty(postsI)
+                            s_L5(postsI) = s_L5(postsI) + amp_EI;
+                        end
                     else
-                        % inhibitory 上层输入应该给 L5E 更小 或 不给
-                        % 为避免抑制 E 过强，需要降低
-                        s_L5(posts) = s_L5(posts) + 0.0; % 不给 I input
+                        % inhibitory presynaptic from upper network: keep disabled by default
+                        % (set to 0 to avoid excessive suppression; adjust here if needed)
+                        % if needed: s_L5(postsE) = s_L5(postsE) + amp_IE_PVp; etc.
                     end
                 end
             end
@@ -674,12 +728,22 @@ for t=1:Nsim % simulation of Ni ms
                         s_L5(postsI) = s_L5(postsI) + amp_EI;
                     end
                 else
-                    % I pre -> E, I
-                    if ~isempty(postsE)
-                        s_L5(postsE) = s_L5(postsE) + amp_IE;
-                    end
-                    if ~isempty(postsI)
-                        s_L5(postsI) = s_L5(postsI) + amp_II;
+                    % I pre -> E, I (split PV+ / PV- amplitudes)
+                    isPVp_pre = jid <= N_L5_E + N_L5_PVp;
+                    if isPVp_pre
+                        if ~isempty(postsE)
+                            s_L5(postsE) = s_L5(postsE) + amp_IE_PVp;
+                        end
+                        if ~isempty(postsI)
+                            s_L5(postsI) = s_L5(postsI) + amp_II_PVp;
+                        end
+                    else
+                        if ~isempty(postsE)
+                            s_L5(postsE) = s_L5(postsE) + amp_IE_PVm;
+                        end
+                        if ~isempty(postsI)
+                            s_L5(postsI) = s_L5(postsI) + amp_II_PVm;
+                        end
                     end
                 end
             end
@@ -723,7 +787,12 @@ for t=1:Nsim % simulation of Ni ms
                 if jid <= N_L5_E
                     s_L23_feedback(posts_main) = s_L23_feedback(posts_main) + amp_EE;
                 else
-                    s_L23_feedback(posts_main) = s_L23_feedback(posts_main) + amp_IE;
+                    isPVp_pre = jid <= N_L5_E + N_L5_PVp;
+                    if isPVp_pre
+                        s_L23_feedback(posts_main) = s_L23_feedback(posts_main) + amp_IE_PVp;
+                    else
+                        s_L23_feedback(posts_main) = s_L23_feedback(posts_main) + amp_IE_PVm;
+                    end
                 end
             end
         end
